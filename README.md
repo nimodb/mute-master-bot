@@ -37,7 +37,6 @@ A Telegram moderation bot designed to maintain order in specific groups by filte
     # .env
     ENVIRONMENT=development  # or 'production'
     BOT_TOKEN=your_bot_token_here
-    PROXY_URL=http://your_proxy_url  # Optional, for development
     ALLOWED_USER_ID=your_user_id_here
     ```
     (See "Create requirements.txt" below if you don’t have this yet.)
@@ -79,5 +78,5 @@ A Telegram moderation bot designed to maintain order in specific groups by filte
 
 
 ## Development vs Production
-- **Development:** Uses a proxy session if `PROXY_URL` is set and `ENVIRONMENT=development`.
-- **Production:** Uses the default session when `ENVIRONMENT=production` (no proxy).
+- **Development:**  `ENVIRONMENT=development`.
+- **Production:**  `ENVIRONMENT=production`.
