@@ -1,12 +1,17 @@
+# Environment variables
+*.env
+
+# Logs
+*.log
+logs/*
+!logs/.gitkeep
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
-env/
+*.egg-info/
+.venv/
 venv/
-*.env
-
-# Miscellaneous
-*.log

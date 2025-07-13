@@ -16,6 +16,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 
 
+# Custom filter for authorized user
 class AdminFilter(Filter):
     def __init__(self, allowed_user_id: int):
         self.allowed_user_id = allowed_user_id
@@ -24,17 +25,16 @@ class AdminFilter(Filter):
         return message.from_user.id == self.allowed_user_id
 
 
+# Middleware to add context to logs
 class LoggingContextMiddleware(BaseMiddleware):
-    """Add user and chat IDs to logs."""
     async def __call__(self, handler, event: TelegramObject, data: dict):
         user_id = getattr(event, 'from_user', None) and event.from_user.id or "N/A"
         chat_id = getattr(event, 'chat', None) and event.chat.id or "N/A"
         data["logging_context"] = {"user_id": user_id, "chat_id": chat_id}
         return await handler(event, data)
 
-
+# Logging configuration
 def setup_logging():
-    """Configure logging based on ENVIRONMENT."""
     log_level = logging.DEBUG if os.getenv("ENVIRONMENT", "development") == "development" else logging.INFO
     log_format = "%(asctime)s - %(levelname)s - [%(chat_id)s|%(user_id)s] - %(message)s"
     
@@ -42,7 +42,7 @@ def setup_logging():
     console_handler.setFormatter(logging.Formatter(log_format))
     
     file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename="mute_master_bot.log", when="midnight", interval=1, backupCount=7
+        filename="logs/mute_master_bot.log", when="midnight", interval=1, backupCount=7
     )
     file_handler.setFormatter(logging.Formatter(log_format))
     
@@ -63,52 +63,45 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
-
-# Constants
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 BOT_TOKEN = os.getenv("BOT_TOKEN", None)
 ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", 0))
 BOT_USERNAME = "@mute_master_bot"
 MUTE_DURATION = 86400  # 24 hours in seconds
 
-# Load group settings from JSON
-def load_groups(file_path: str = "groups.json") -> dict:
-    """Load group settings from JSON file."""
-    logger.debug("Attempting to load groups from %s", file_path)
+# File operations
+def load_json_file(file_path: str, default: dict) -> dict:
     if not os.path.exists(file_path):
-        logger.warning("%s does not exist. Returning empty group settings.", file_path)
-        return {}
-    
+        logger.warning("%s does not exist. Creating with default content.", file_path)
+        save_json_file(default, file_path)
+        return default
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                logger.warning("%s is empty. Returning empty group settings.", file_path)
-                return {}
-            groups = json.loads(content)
-        groups_converted = {int(k): v for k, v in groups.items()}
-        logger.debug("Loaded groups.")
-        return groups_converted
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.error("Failed to load %s: %s. Using empty group settings.", file_path, e)
-        return {}
-    except Exception as e:
-        logger.error("Unexpected error loading %s: %s", file_path, e)
-        return {}
+            content = f.read().strip()
+            if not content:
+                logger.warning("%s is empty. Creating with default content.", file_path)
+                save_json_file(default, file_path)
+                return default
+            data = json.loads(content)
+        return {str(k): v for k, v in data.items()} if isinstance(data, dict) else default
+    except (json.JSONDecodeError, PermissionError, OSError) as e:
+        logger.error("Failed to load %s: %s. Using default.", file_path, e)
+        save_json_file(default, file_path)
+        return default
 
 
-def save_groups(groups: dict, file_path: str = "groups.json") -> None:
-    """Save group settings to JSON file."""
-    logger.debug("Saving groups to %s: %s", file_path, groups)
+def save_json_file(data: dict, file_path: str) -> None:
     try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(groups, f, indent=4, ensure_ascii=False)
-        logger.info("Group settings saved to %s", file_path)
-    except Exception as e:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        logger.info("%s saved successfully.", file_path)
+    except (PermissionError, OSError) as e:
         logger.error("Failed to save %s: %s", file_path, e)
 
 
-SPECIFIC_GROUP_IDS = load_groups()
+SPECIFIC_GROUP_IDS = load_json_file("config/groups.json", {})
+USER_SETTINGS = load_json_file("config/user_settings.json", {str(ALLOWED_USER_ID): {"language": "en"}})
 
 # Configuration
 WHITELISTED_DOMAINS: Set[str] = {"visametric.com"}
@@ -116,9 +109,7 @@ WHITELISTED_USERNAMES: Set[str] = {BOT_USERNAME, "@Vi_Ka1401", "@Tna_jy"}
 WHITELISTED_TLDS: Set[str] = {".de"}
 
 # Pre-compiled regex patterns
-URL_PATTERN = re.compile(
-    r'(?:https?://)?(?:www\.)?[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}(?:/[^ ]*)?', re.IGNORECASE
-)
+URL_PATTERN = re.compile(r'(?:https?://)?(?:www\.)?[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}(?:/[^ ]*)?', re.IGNORECASE)
 USERNAME_PATTERN = re.compile(r'@\w+', re.IGNORECASE)
 
 # Localized messages
@@ -126,76 +117,106 @@ MESSAGES = {
     "en": {
         "chat_not_monitored": "This group is not monitored. Please contact @nimodb to enable moderation.",
         "group_inactive": "Moderation is disabled in this group. Contact @nimodb for assistance.",
-        "private_unauthorized": (
-            "Sorry, only authorized users can interact with me privately.\n"
-            "Please contact my creator @nimodb for support."
-        ),
+        "private_unauthorized": "Sorry, only authorized users can interact with me privately. Contact @nimodb for support.",
         "add_to_group_prompt": (
             "To add me to your group, click the link below and select your group:\n"
             "[Add to Group](https://t.me/{bot_username}?startgroup=true&admin=delete_messages+restrict_members+invite_users)\n\n"
             "⚠️ *Note*: You need 'Add Administrators' permission to add me."
         ),
-        "warning_issued": (
-            "Warning {current}/{max} for {user_mention}:\n"
-            "Links, unauthorized usernames, or inappropriate words are not allowed."
-        ),
-        "user_restricted": (
-            "Due to {max_warnings} violations, {user_mention} has been {action} for {duration}."
-        ),
+        "warning_issued": "Warning {current}/{max} for {user_mention}: Links, unauthorized usernames, or inappropriate words are not allowed.",
+        "user_restricted": "Due to {max_warnings} violations, {user_mention} has been {action} for {duration}.",
         "invalid_private_message": (
             "Please use one of the following commands or select 'Add the bot to group':\n\n"
             "*Available Commands:*\n"
             "- `/addgroup <group_id>`: Add a group for moderation.\n"
             "- `/setwarnings <group_id> <number>`: Set maximum warnings for a group.\n"
-            "- `/setaction <group_id> <mute|ban>`: Set the action (mute or ban) for violations.\n"
-            "- `/toggleactive <group_id>`: Enable or disable moderation for a group.\n"
-            "- `/setlanguage <group_id> <en|fa>`: Set the language for group messages.\n"
-            "- `/listgroups`: List all monitored groups and their settings.\n"
-            "- `/removegroup`: Remove a group for moderation.\n"
+            "- `/setaction <group_id> <mute|ban>`: Set the action for violations.\n"
+            "- `/toggleactive <group_id>`: Enable or disable moderation.\n"
+            "- `/setlanguage <group_id> <en|fa>`: Set group message language.\n"
+            "- `/setuserlanguage <en|fa>`: Set your preferred language.\n"
+            "- `/listgroups`: List all monitored groups.\n"
+            "- `/removegroup <group_id>`: Remove a group from moderation."
         ),
-        "user_language_set": "Your language has been set to {language}."
+        "group_added": "Group {group_id} added for moderation with default settings.",
+        "group_already_monitored": "This group is already monitored.",
+        "invalid_group_id": "Invalid group ID. Must be a group or supergroup.",
+        "bot_not_member": "Bot is not a member of this group or invalid ID.",
+        "usage_addgroup": "Usage: `/addgroup <group_id>`",
+        "group_not_monitored": "This group is not monitored.",
+        "warnings_must_be_positive": "Warnings must be positive.",
+        "max_warnings_set": "Max warnings set to {warnings} for group {group_id}.",
+        "usage_setwarnings": "Usage: `/setwarnings <group_id> <number>`",
+        "action_must_be_mute_or_ban": "Action must be 'mute' or 'ban'.",
+        "action_set": "Action set to {action} for group {group_id}.",
+        "usage_setaction": "Usage: `/setaction <group_id> <mute|ban>`",
+        "moderation_enabled": "Moderation enabled for group {group_id}.",
+        "moderation_disabled": "Moderation disabled for group {group_id}.",
+        "usage_toggleactive": "Usage: `/toggleactive <group_id>`",
+        "language_must_be_en_or_fa": "Language must be 'en' or 'fa'.",
+        "language_set": "Language set to {language} for group {group_id}.",
+        "usage_setlanguage": "Usage: `/setlanguage <group_id> <en|fa>`",
+        "no_groups_monitored": "No groups are monitored. Add groups using `/addgroup <group_id>`.",
+        "error_listing_groups": "Error listing groups. Please check logs.",
+        "group_removed": "Group {group_id} removed from moderation.",
+        "usage_removegroup": "Usage: `/removegroup <group_id>`",
+        "user_language_set": "Your language has been set to {language}.",
+        "usage_setuserlanguage": "Usage: `/setuserlanguage <en|fa>`"
     },
     "fa": {
         "chat_not_monitored": "این گروه تحت نظارت نیست. لطفاً با @nimodb تماس بگیرید تا نظارت فعال شود.",
         "group_inactive": "نظارت در این گروه غیرفعال است. برای راهنمایی با @nimodb تماس بگیرید.",
-        "private_unauthorized": (
-            "متأسفم، فقط کاربران مجاز می‌توانند به‌صورت خصوصی با من تعامل کنند.\n"
-            "لطفاً برای پشتیبانی با سازنده من @nimodb تماس بگیرید."
-        ),
+        "private_unauthorized": "متأسفم، فقط کاربران مجاز می‌توانند به‌صورت خصوصی با من تعامل کنند. با @nimodb تماس بگیرید.",
         "add_to_group_prompt": (
             "برای افزودن من به گروه خود، روی لینک زیر کلیک کنید و گروه موردنظر را انتخاب کنید:\n"
             "[افزودن به گروه](https://t.me/{bot_username}?startgroup=true&admin=delete_messages+restrict_members+invite_users)\n\n"
             "⚠️ *توجه*: برای افزودن من نیاز به مجوز 'افزودن مدیران' دارید."
         ),
-        "warning_issued": (
-            "اخطار {current}/{max} برای {user_mention}:\n"
-            "لینک‌ها، نام‌های کاربری غیرمجاز یا کلمات نامناسب ممنوع است."
-        ),
-        "user_restricted": (
-            "به دلیل {max_warnings} تخلف، {user_mention} به مدت {duration} {action} شد."
-        ),
+        "warning_issued": "اخطار {current}/{max} برای {user_mention}: لینک‌ها، نام‌های کاربری غیرمجاز یا کلمات نامناسب ممنوع است.",
+        "user_restricted": "به دلیل {max_warnings} تخلف، {user_mention} به مدت {duration} {action} شد.",
         "invalid_private_message": (
             "لطفاً از یکی از دستورات زیر استفاده کنید یا گزینه 'افزودن ربات به گروه' را انتخاب کنید:\n\n"
             "*دستورات موجود:*\n"
             "- `/addgroup <group_id>`: افزودن یک گروه برای نظارت.\n"
-            "- `/setwarnings <group_id> <number>`: تنظیم حداکثر تعداد اخطارها برای یک گروه.\n"
-            "- `/setaction <group_id> <mute|ban>`: تنظیم اقدام (محدودیت یا مسدودیت) برای تخلفات.\n"
-            "- `/toggleactive <group_id>`: فعال یا غیرفعال کردن نظارت برای یک گروه.\n"
+            "- `/setwarnings <group_id> <number>`: تنظیم حداکثر اخطارها برای یک گروه.\n"
+            "- `/setaction <group_id> <mute|ban>`: تنظیم اقدام برای تخلفات.\n"
+            "- `/toggleactive <group_id>`: فعال یا غیرفعال کردن نظارت.\n"
             "- `/setlanguage <group_id> <en|fa>`: تنظیم زبان پیام‌های گروه.\n"
-            "- `/listgroups`: نمایش تمام گروه‌های تحت نظارت و تنظیمات آن‌ها.\n"
-            "- `/removegroup`: حذف یک گروه برای نظارت.\n"
+            "- `/setuserlanguage <en|fa>`: تنظیم زبان مورد نظر شما.\n"
+            "- `/listgroups`: نمایش تمام گروه‌های تحت نظارت.\n"
+            "- `/removegroup <group_id>`: حذف یک گروه از نظارت."
         ),
-        "user_language_set": "زبان شما به {language} تنظیم شد."
+        "group_added": "گروه {group_id} با تنظیمات پیش‌فرض برای نظارت افزوده شد.",
+        "group_already_monitored": "این گروه قبلاً تحت نظارت است.",
+        "invalid_group_id": "آیدی گروه نامعتبر است. باید یک گروه یا سوپرگروه باشد.",
+        "bot_not_member": "ربات عضو این گروه نیست یا آیدی نامعتبر است.",
+        "usage_addgroup": "نحوه استفاده: `/addgroup <group_id>`",
+        "group_not_monitored": "این گروه تحت نظارت نیست.",
+        "warnings_must_be_positive": "اخطارها باید مثبت باشند.",
+        "max_warnings_set": "حداکثر اخطارها به {warnings} برای گروه {group_id} تنظیم شد.",
+        "usage_setwarnings": "نحوه استفاده: `/setwarnings <group_id> <number>`",
+        "action_must_be_mute_or_ban": "اقدام باید 'mute' یا 'ban' باشد.",
+        "action_set": "اقدام به {action} برای گروه {group_id} تنظیم شد.",
+        "usage_setaction": "نحوه استفاده: `/setaction <group_id> <mute|ban>`",
+        "moderation_enabled": "نظارت برای گروه {group_id} فعال شد.",
+        "moderation_disabled": "نظارت برای گروه {group_id} غیرفعال شد.",
+        "usage_toggleactive": "نحوه استفاده: `/toggleactive <group_id>`",
+        "language_must_be_en_or_fa": "زبان باید 'en' یا 'fa' باشد.",
+        "language_set": "زبان به {language} برای گروه {group_id} تنظیم شد.",
+        "usage_setlanguage": "نحوه استفاده: `/setlanguage <group_id> <en|fa>`",
+        "no_groups_monitored": "هیچ گروهی تحت نظارت نیست. با `/addgroup <group_id>` گروه اضافه کنید.",
+        "error_listing_groups": "خطا در نمایش گروه‌ها. لاگ‌ها را بررسی کنید。",
+        "group_removed": "گروه {group_id} از نظارت حذف شد.",
+        "usage_removegroup": "نحوه استفاده: `/removegroup <group_id>`",
+        "user_language_set": "زبان شما به {language} تنظیم شد.",
+        "usage_setuserlanguage": "نحوه استفاده: `/setuserlanguage <en|fa>`"
     }
 }
 
 # Global state
 WARNINGS = defaultdict(int)
 
-
 @lru_cache(maxsize=1)
-def load_cuss_words(file_path: str = "cuss_words.json") -> re.Pattern:
-    """Load and compile cuss words pattern with caching."""
+def load_cuss_words(file_path: str = "config/cuss_words.json") -> re.Pattern:
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             cuss_dict = json.load(f)
@@ -210,7 +231,6 @@ CUSS_WORDS_PATTERN = load_cuss_words()
 
 # Utility functions
 def normalize_text(text: str) -> str:
-    """Remove duplicate letters from words."""
     return " ".join(
         "".join(char for i, char in enumerate(word) if i == 0 or char != word[i-1])
         for word in text.split()
@@ -218,7 +238,6 @@ def normalize_text(text: str) -> str:
 
 
 def contains_violation(text: str, entities: Optional[list[MessageEntity]] = None) -> bool:
-    """Check if message contains violations."""
     text_lower = text.lower()
     
     url_match = URL_PATTERN.search(text_lower)
@@ -227,7 +246,7 @@ def contains_violation(text: str, entities: Optional[list[MessageEntity]] = None
         domain = urlparse(url if url.startswith("http") else "http://" + url).hostname
         if not (any(domain.endswith(tld) for tld in WHITELISTED_TLDS) or 
                 any(domain.endswith(wl) for wl in WHITELISTED_DOMAINS)):
-            logger.debug("Non-whitelisted URL detected: %s", url)
+            logger.debug("Non-whitelisted URL detected")
             return True
 
     if entities:
@@ -237,16 +256,16 @@ def contains_violation(text: str, entities: Optional[list[MessageEntity]] = None
                 domain = urlparse(url).hostname
                 if domain and not (any(domain.endswith(tld) for tld in WHITELISTED_TLDS) or 
                                 any(domain.endswith(wl) for wl in WHITELISTED_DOMAINS)):
-                    logger.debug("Non-whitelisted entity URL detected: %s", url)
+                    logger.debug("Non-whitelisted entity URL detected")
                     return True
 
     if CUSS_WORDS_PATTERN.search(normalize_text(text_lower)):
-        logger.debug("Cuss word detected in message")
+        logger.debug("Cuss word detected")
         return True
 
     usernames = USERNAME_PATTERN.findall(text)
     if usernames and not all(u in WHITELISTED_USERNAMES for u in usernames):
-        logger.debug("Non-whitelisted username detected: %s", usernames)
+        logger.debug("Non-whitelisted username detected")
         return True
     return False
 
@@ -269,32 +288,8 @@ def contains_link(text: str, entities: Optional[list[MessageEntity]] = None) -> 
                     return not any(domain.endswith(whitelisted_domain) for whitelisted_domain in WHITELISTED_DOMAINS)
     return False
 
-
-def remove_duplicate_letters(text: str) -> str:
-    """Remove duplicate letters from words."""
-    words = text.split()
-    normalized_words = []
-    for word in words:
-        result = ""
-        prev_char = None
-        for char in word:
-            if char != prev_char:
-                result += char
-                prev_char = char
-        normalized_words.append(result)
-    return " ".join(normalized_words)
-
-
-def contains_cuss_word(text: str) -> bool:
-    """Check if text contains cuss words."""
-    normalized_text = remove_duplicate_letters(text.lower())
-    return bool(CUSS_WORDS_PATTERN.search(normalized_text))
-
-
 def get_user_display_name(user) -> str:
-    """Get user's display name."""
     return user.first_name or f"@{user.username}" or f"کاربر {user.id}"
-
 
 # Bot setup
 bot = Bot(token=BOT_TOKEN)
@@ -302,8 +297,7 @@ dispatcher = Dispatcher()
 
 # Moderation actions
 async def apply_restriction(message: Message, user_id: int, user_mention: str, 
-                           max_warnings: int, action: str, lang: str = "fa") -> None:
-    """Apply mute or ban restriction."""
+                            max_warnings: int, action: str, lang: str) -> None:
     try:
         if action == "mute":
             await bot.restrict_chat_member(
@@ -312,12 +306,12 @@ async def apply_restriction(message: Message, user_id: int, user_mention: str,
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=int(message.date.timestamp()) + MUTE_DURATION
             )
-            duration_text = f"{MUTE_DURATION // 3600} ساعت" if lang == "fa" else f"{MUTE_DURATION // 3600} hours"
-            action_text = "محدود" if lang == "fa" else "muted"
+            duration_text = f"{MUTE_DURATION // 3600} hours" if lang == "en" else f"{MUTE_DURATION // 3600} ساعت"
+            action_text = "muted" if lang == "en" else "محدود"
         else:  # ban
             await bot.ban_chat_member(chat_id=message.chat.id, user_id=user_id)
-            duration_text = "همیشه" if lang == "fa" else "permanently"
-            action_text = "مسدود" if lang == "fa" else "banned"
+            duration_text = "permanently" if lang == "en" else "همیشه"
+            action_text = "banned" if lang == "en" else "مسدود"
 
         await message.answer(
             MESSAGES[lang]["user_restricted"].format(
@@ -328,17 +322,15 @@ async def apply_restriction(message: Message, user_id: int, user_mention: str,
             ),
             parse_mode="Markdown"
         )
-        logger.info("User %s %s in chat %s for %s", user_id, action_text, message.chat.id, duration_text)
+        logger.info("User %s %s in chat %s", user_id, action_text, message.chat.id)
     except TelegramAPIError as e:
-        logger.error("Failed to apply restriction for user %s in chat %s: %s", user_id, message.chat.id, e)
-
+        logger.error("Failed to restrict user %s in chat %s: %s", user_id, message.chat.id, e)
 
 async def moderate_message(message: Message) -> None:
-    """Handle group/supergroup messages for moderation."""
-    settings = SPECIFIC_GROUP_IDS.get(message.chat.id, {})
+    settings = SPECIFIC_GROUP_IDS.get(str(message.chat.id), {})
     lang = settings.get("language", "fa")
     
-    if message.chat.id not in SPECIFIC_GROUP_IDS:
+    if not settings:
         logger.warning("Unmonitored chat detected")
         await message.answer(MESSAGES[lang]["chat_not_monitored"], parse_mode="Markdown")
         return
@@ -363,12 +355,10 @@ async def moderate_message(message: Message) -> None:
             await message.delete()
             WARNINGS[user_id] += 1
             user_mention = f"[{get_user_display_name(message.from_user)}](tg://user?id={user_id})"
-            logger.info("Violation detected from user %s, warning %s/%s", 
-                        user_id, WARNINGS[user_id], settings["max_warnings"])
+            logger.info("Violation by user %s, warning %s/%s", user_id, WARNINGS[user_id], settings["max_warnings"])
             
             if WARNINGS[user_id] >= settings["max_warnings"]:
-                await apply_restriction(message, user_id, user_mention, 
-                                      settings["max_warnings"], settings["action"], lang)
+                await apply_restriction(message, user_id, user_mention, settings["max_warnings"], settings["action"], lang)
                 WARNINGS[user_id] = 0
             else:
                 await message.answer(
@@ -382,11 +372,9 @@ async def moderate_message(message: Message) -> None:
         except TelegramAPIError as e:
             logger.error("Moderation error for user %s: %s", user_id, e)
 
-
 async def private_chat_handler(message: Message) -> None:
-    """Handle non-command private chat messages."""
-    logger.debug("Processing private_chat_handler, message: %s", message.text)
-    lang = "en"
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
     
     if message.from_user.id != ALLOWED_USER_ID:
         logger.warning("Unauthorized private message")
@@ -407,120 +395,131 @@ async def private_chat_handler(message: Message) -> None:
         )
         logger.debug("Sent add_to_group_prompt")
     else:
-        await message.reply(
-            MESSAGES[lang]["invalid_private_message"],
-            parse_mode="Markdown"
-        )
-        logger.debug("Sent invalid_private_message response for: %s", message.text)
-
+        await message.reply(MESSAGES[lang]["invalid_private_message"], parse_mode="Markdown")
+        logger.debug("Sent invalid_private_message response")
 
 async def add_group(message: Message) -> None:
-    """Add a group for moderation."""
-    logger.debug("Processing /addgroup")
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
     try:
         group_id = int(message.text.split()[1])
-        if group_id in SPECIFIC_GROUP_IDS:
-            await message.reply("This group is already monitored.", parse_mode="Markdown")
+        group_id_str = str(group_id)
+        if group_id_str in SPECIFIC_GROUP_IDS:
+            await message.reply(MESSAGES[lang]["group_already_monitored"], parse_mode="Markdown")
             return
         try:
             chat = await bot.get_chat(group_id)
             if chat.type not in ("group", "supergroup"):
-                await message.reply("Invalid group ID. Must be a group or supergroup.", parse_mode="Markdown")
+                await message.reply(MESSAGES[lang]["invalid_group_id"], parse_mode="Markdown")
                 return
         except TelegramAPIError:
-            await message.reply("Bot is not a member of this group or invalid ID.", parse_mode="Markdown")
+            await message.reply(MESSAGES[lang]["bot_not_member"], parse_mode="Markdown")
             return
-        SPECIFIC_GROUP_IDS[group_id] = {
-            "active": True, "max_warnings": 3, "action": "mute", "language": "fa"
-        }
-        save_groups(SPECIFIC_GROUP_IDS)
-        await message.reply(f"Group {group_id} added for moderation with default settings.", parse_mode="Markdown")
+        SPECIFIC_GROUP_IDS[group_id_str] = {"active": True, "max_warnings": 3, "action": "mute", "language": "fa"}
+        save_json_file(SPECIFIC_GROUP_IDS, "config/groups.json")
+        await message.reply(MESSAGES[lang]["group_added"].format(group_id=group_id), parse_mode="Markdown")
         logger.info("Group %s added", group_id)
     except (IndexError, ValueError):
-        await message.reply("Usage: `/addgroup <group_id>`", parse_mode="Markdown")
-
+        await message.reply(MESSAGES[lang]["usage_addgroup"], parse_mode="Markdown")
 
 async def set_warnings(message: Message) -> None:
-    """Set maximum warnings for a group."""
-    logger.debug("Processing /setwarnings")
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
     try:
         group_id, warnings = map(int, message.text.split()[1:3])
-        if group_id not in SPECIFIC_GROUP_IDS:
-            await message.reply("This group is not monitored.", parse_mode="Markdown")
+        group_id_str = str(group_id)
+        if group_id_str not in SPECIFIC_GROUP_IDS:
+            await message.reply(MESSAGES[lang]["group_not_monitored"], parse_mode="Markdown")
             return
         if warnings < 1:
-            raise ValueError("Warnings must be positive")
-        SPECIFIC_GROUP_IDS[group_id]["max_warnings"] = warnings
-        save_groups(SPECIFIC_GROUP_IDS)
-        await message.reply(f"Max warnings set to {warnings} for group {group_id}.", parse_mode="Markdown")
+            await message.reply(MESSAGES[lang]["warnings_must_be_positive"], parse_mode="Markdown")
+            return
+        SPECIFIC_GROUP_IDS[group_id_str]["max_warnings"] = warnings
+        save_json_file(SPECIFIC_GROUP_IDS, "config/groups.json")
+        await message.reply(MESSAGES[lang]["max_warnings_set"].format(warnings=warnings, group_id=group_id), parse_mode="Markdown")
         logger.info("Max warnings set to %s for group %s", warnings, group_id)
     except (IndexError, ValueError):
-        await message.reply("Usage: `/setwarnings <group_id> <number>`", parse_mode="Markdown")
-
+        await message.reply(MESSAGES[lang]["usage_setwarnings"], parse_mode="Markdown")
 
 async def set_action(message: Message) -> None:
-    """Set action (mute or ban) for a group."""
-    logger.debug("Processing /setaction")
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
     try:
         group_id, action = message.text.split()[1:3]
         group_id = int(group_id)
         action = action.lower()
-        if group_id not in SPECIFIC_GROUP_IDS:
-            await message.reply("This group is not monitored.", parse_mode="Markdown")
+        group_id_str = str(group_id)
+        if group_id_str not in SPECIFIC_GROUP_IDS:
+            await message.reply(MESSAGES[lang]["group_not_monitored"], parse_mode="Markdown")
             return
         if action not in ("mute", "ban"):
-            raise ValueError("Action must be 'mute' or 'ban'")
-        SPECIFIC_GROUP_IDS[group_id]["action"] = action
-        save_groups(SPECIFIC_GROUP_IDS)
-        await message.reply(f"Action set to {action} for group {group_id}.", parse_mode="Markdown")
+            await message.reply(MESSAGES[lang]["action_must_be_mute_or_ban"], parse_mode="Markdown")
+            return
+        SPECIFIC_GROUP_IDS[group_id_str]["action"] = action
+        save_json_file(SPECIFIC_GROUP_IDS, "config/groups.json")
+        await message.reply(MESSAGES[lang]["action_set"].format(action=action, group_id=group_id), parse_mode="Markdown")
         logger.info("Action set to %s for group %s", action, group_id)
     except (IndexError, ValueError):
-        await message.reply("Usage: `/setaction <group_id> <mute|ban>`", parse_mode="Markdown")
-
+        await message.reply(MESSAGES[lang]["usage_setaction"], parse_mode="Markdown")
 
 async def toggle_active(message: Message) -> None:
-    """Toggle moderation active status for a group."""
-    logger.debug("Processing /toggleactive")
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
     try:
         group_id = int(message.text.split()[1])
-        if group_id not in SPECIFIC_GROUP_IDS:
-            await message.reply("This group is not monitored.", parse_mode="Markdown")
+        group_id_str = str(group_id)
+        if group_id_str not in SPECIFIC_GROUP_IDS:
+            await message.reply(MESSAGES[lang]["group_not_monitored"], parse_mode="Markdown")
             return
-        SPECIFIC_GROUP_IDS[group_id]["active"] = not SPECIFIC_GROUP_IDS[group_id]["active"]
-        save_groups(SPECIFIC_GROUP_IDS)
-        status = "enabled" if SPECIFIC_GROUP_IDS[group_id]["active"] else "disabled"
-        await message.reply(f"Moderation {status} for group {group_id}.", parse_mode="Markdown")
+        SPECIFIC_GROUP_IDS[group_id_str]["active"] = not SPECIFIC_GROUP_IDS[group_id_str]["active"]
+        save_json_file(SPECIFIC_GROUP_IDS, "config/groups.json")
+        status = "enabled" if SPECIFIC_GROUP_IDS[group_id_str]["active"] else "disabled"
+        await message.reply(MESSAGES[lang][f"moderation_{status}"].format(group_id=group_id), parse_mode="Markdown")
         logger.info("Moderation %s for group %s", status, group_id)
     except (IndexError, ValueError):
-        await message.reply("Usage: `/toggleactive <group_id>`", parse_mode="Markdown")
-
+        await message.reply(MESSAGES[lang]["usage_toggleactive"], parse_mode="Markdown")
 
 async def set_language(message: Message) -> None:
-    """Set language for group messages."""
-    logger.debug("Processing /setlanguage")
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
     try:
         group_id, language = message.text.split()[1:3]
         group_id = int(group_id)
         language = language.lower()
-        if group_id not in SPECIFIC_GROUP_IDS:
-            await message.reply("This group is not monitored.", parse_mode="Markdown")
+        group_id_str = str(group_id)
+        if group_id_str not in SPECIFIC_GROUP_IDS:
+            await message.reply(MESSAGES[lang]["group_not_monitored"], parse_mode="Markdown")
             return
         if language not in ("en", "fa"):
-            raise ValueError("Language must be 'en' or 'fa'")
-        SPECIFIC_GROUP_IDS[group_id]["language"] = language
-        save_groups(SPECIFIC_GROUP_IDS)
-        await message.reply(f"Language set to {language} for group {group_id}.", parse_mode="Markdown")
+            await message.reply(MESSAGES[lang]["language_must_be_en_or_fa"], parse_mode="Markdown")
+            return
+        SPECIFIC_GROUP_IDS[group_id_str]["language"] = language
+        save_json_file(SPECIFIC_GROUP_IDS, "config/groups.json")
+        await message.reply(MESSAGES[lang]["language_set"].format(language=language, group_id=group_id), parse_mode="Markdown")
         logger.info("Language set to %s for group %s", language, group_id)
     except (IndexError, ValueError):
-        await message.reply("Usage: `/setlanguage <group_id> <en|fa>`", parse_mode="Markdown")
+        await message.reply(MESSAGES[lang]["usage_setlanguage"], parse_mode="Markdown")
 
+async def set_user_language(message: Message) -> None:
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
+    try:
+        new_lang = message.text.split()[1].lower()
+        if new_lang not in ("en", "fa"):
+            await message.reply(MESSAGES[lang]["language_must_be_en_or_fa"], parse_mode="Markdown")
+            return
+        USER_SETTINGS[user_id] = {"language": new_lang}
+        save_json_file(USER_SETTINGS, "config/user_settings.json")
+        await message.reply(MESSAGES[new_lang]["user_language_set"].format(language=new_lang), parse_mode="Markdown")
+        logger.info("User %s language set to %s", user_id, new_lang)
+    except IndexError:
+        await message.reply(MESSAGES[lang]["usage_setuserlanguage"], parse_mode="Markdown")
 
 async def list_groups(message: Message) -> None:
-    """List all monitored groups."""
-    logger.debug("Processing /listgroups, SPECIFIC_GROUP_IDS: %s", SPECIFIC_GROUP_IDS)
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
     if not SPECIFIC_GROUP_IDS:
-        logger.info("No groups found in SPECIFIC_GROUP_IDS")
-        await message.reply("No groups are monitored. Add groups using `/addgroup <group_id>`.", parse_mode="Markdown")
+        await message.reply(MESSAGES[lang]["no_groups_monitored"], parse_mode="Markdown")
         return
     try:
         group_items = [
@@ -529,31 +528,30 @@ async def list_groups(message: Message) -> None:
         ]
         group_list = "\n".join(group_items)
         await message.reply(f"*Monitored groups:*\n{group_list}", parse_mode="Markdown")
-        logger.info("Listed groups: %s", group_list)
+        logger.info("Listed groups")
     except Exception as e:
         logger.error("Error listing groups: %s", e)
-        await message.reply("Error listing groups. Please check logs.", parse_mode="Markdown")
-
+        await message.reply(MESSAGES[lang]["error_listing_groups"], parse_mode="Markdown")
 
 async def remove_group(message: Message) -> None:
-    """Remove a group from moderation."""
-    logger.debug("Processing /removegroup")
+    user_id = str(message.from_user.id)
+    lang = USER_SETTINGS.get(user_id, {"language": "fa"})["language"]
     try:
         group_id = int(message.text.split()[1])
-        if group_id not in SPECIFIC_GROUP_IDS:
-            await message.reply("This group is not monitored.", parse_mode="Markdown")
+        group_id_str = str(group_id)
+        if group_id_str not in SPECIFIC_GROUP_IDS:
+            await message.reply(MESSAGES[lang]["group_not_monitored"], parse_mode="Markdown")
             return
-        del SPECIFIC_GROUP_IDS[group_id]
-        save_groups(SPECIFIC_GROUP_IDS)
-        await message.reply(f"Group {group_id} removed from moderation.", parse_mode="Markdown")
+        del SPECIFIC_GROUP_IDS[group_id_str]
+        save_json_file(SPECIFIC_GROUP_IDS, "config/groups.json")
+        await message.reply(MESSAGES[lang]["group_removed"].format(group_id=group_id), parse_mode="Markdown")
         logger.info("Group %s removed", group_id)
     except (IndexError, ValueError):
-        await message.reply("Usage: `/removegroup <group_id>`", parse_mode="Markdown")
+        await message.reply(MESSAGES[lang]["usage_removegroup"], parse_mode="Markdown")
 
 # Startup and main
 async def on_startup():
     logger.info("Mute Master Bot is online!")
-
 
 async def main():
     if not BOT_TOKEN:
@@ -562,13 +560,13 @@ async def main():
     
     dispatcher.update.middleware(LoggingContextMiddleware())
     
-    # Register handlers
     dispatcher.message.register(moderate_message, lambda m: m.chat.type in ("group", "supergroup"))
     dispatcher.message.register(add_group, Command("addgroup"), lambda m: m.chat.type == "private", AdminFilter(ALLOWED_USER_ID))
     dispatcher.message.register(set_warnings, Command("setwarnings"), lambda m: m.chat.type == "private", AdminFilter(ALLOWED_USER_ID))
     dispatcher.message.register(set_action, Command("setaction"), lambda m: m.chat.type == "private", AdminFilter(ALLOWED_USER_ID))
     dispatcher.message.register(toggle_active, Command("toggleactive"), lambda m: m.chat.type == "private", AdminFilter(ALLOWED_USER_ID))
     dispatcher.message.register(set_language, Command("setlanguage"), lambda m: m.chat.type == "private", AdminFilter(ALLOWED_USER_ID))
+    dispatcher.message.register(set_user_language, Command("setuserlanguage"), lambda m: m.chat.type == "private", AdminFilter(ALLOWED_USER_ID))
     dispatcher.message.register(list_groups, Command("listgroups"), lambda m: m.chat.type == "private", AdminFilter(ALLOWED_USER_ID))
     dispatcher.message.register(remove_group, Command("removegroup"), lambda m: m.chat.type == "private", AdminFilter(ALLOWED_USER_ID))
     dispatcher.message.register(private_chat_handler, lambda m: m.chat.type == "private" and m.text and not m.text.startswith('/'))
@@ -581,7 +579,6 @@ async def main():
         raise
     finally:
         await bot.session.close()
-
 
 if __name__ == "__main__":
     setup_logging()
