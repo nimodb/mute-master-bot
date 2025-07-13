@@ -16,9 +16,10 @@ mute_master_bot/
 │   └── bot.py              # Main bot script
 ├── config/
 │   ├── .env                # Environment variables
-│   ├── groups.json         # Group settings
-│   ├── user_settings.json  # User language settings
-│   └── cuss_words.json     # Moderation word list
+│   ├── groups.json         # Group settings (auto-created, ignored by Git)
+│   ├── user_settings.json  # User language settings (auto-created, ignored by Git)
+│   ├── cuss_words.json     # Moderation word list
+│   └── messages.json       # Localized message templates
 ├── logs/
 │   └── mute_master_bot.log # Log files
 ├── tests/
@@ -36,7 +37,8 @@ mute_master_bot/
 4. Install dependencies: `pip install -r requirements.txt`
 5. Set up `.env` in `config/` with `BOT_TOKEN`, `ALLOWED_USER_ID`, and `ENVIRONMENT=production`.
 6. Create `config/cuss_words.json` with moderation words.
-7. Run the bot: `python src/bot.py`
+7. Create `config/messages.json` with localized message templates.
+8. Run the bot: `python src/bot.py`
 
 ## Commands
 - `/addgroup <group_id>`: Add a group for moderation.
@@ -56,4 +58,3 @@ mute_master_bot/
 ## Notes
 - Commands are restricted to the authorized user in private chat.
 - Logs rotate daily with a 7-day backup.
-- Ensure `config/.env` is not committed to version control.
