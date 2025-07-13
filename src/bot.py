@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-BOT_TOKEN = os.getenv("BOT_TOKEN", None)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", 0))
 BOT_USERNAME = "@mute_master_bot"
 MUTE_DURATION = 86400  # 24 hours in seconds
@@ -89,7 +89,6 @@ def load_json_file(file_path: str, default: dict) -> dict:
         save_json_file(default, file_path)
         return default
 
-
 def save_json_file(data: dict, file_path: str) -> None:
     try:
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -98,7 +97,6 @@ def save_json_file(data: dict, file_path: str) -> None:
         logger.info("%s saved successfully.", file_path)
     except (PermissionError, OSError) as e:
         logger.error("Failed to save %s: %s", file_path, e)
-
 
 SPECIFIC_GROUP_IDS = load_json_file("config/groups.json", {})
 USER_SETTINGS = load_json_file("config/user_settings.json", {str(ALLOWED_USER_ID): {"language": "en"}})
@@ -115,7 +113,7 @@ USERNAME_PATTERN = re.compile(r'@\w+', re.IGNORECASE)
 # Localized messages
 MESSAGES = {
     "en": {
-        "chat_not_monitored": "This group is not monitored. Please contact @nimodb to enable moderation.",
+        "chat_not_monitored": "This [group](text://{group_id}) is not monitored. Please contact @nimodb to enable moderation.",
         "group_inactive": "Moderation is disabled in this group. Contact @nimodb for assistance.",
         "private_unauthorized": "Sorry, only authorized users can interact with me privately. Contact @nimodb for support.",
         "add_to_group_prompt": (
@@ -163,7 +161,7 @@ MESSAGES = {
         "usage_setuserlanguage": "Usage: `/setuserlanguage <en|fa>`"
     },
     "fa": {
-        "chat_not_monitored": "این گروه تحت نظارت نیست. لطفاً با @nimodb تماس بگیرید تا نظارت فعال شود.",
+        "chat_not_monitored": "این [گروه](text://{group_id}) تحت نظارت نیست. لطفاً با @nimodb تماس بگیرید تا نظارت فعال شود.",
         "group_inactive": "نظارت در این گروه غیرفعال است. برای راهنمایی با @nimodb تماس بگیرید.",
         "private_unauthorized": "متأسفم، فقط کاربران مجاز می‌توانند به‌صورت خصوصی با من تعامل کنند. با @nimodb تماس بگیرید.",
         "add_to_group_prompt": (
@@ -326,13 +324,17 @@ async def apply_restriction(message: Message, user_id: int, user_mention: str,
     except TelegramAPIError as e:
         logger.error("Failed to restrict user %s in chat %s: %s", user_id, message.chat.id, e)
 
+# Moderation actions
 async def moderate_message(message: Message) -> None:
     settings = SPECIFIC_GROUP_IDS.get(str(message.chat.id), {})
     lang = settings.get("language", "fa")
     
     if not settings:
         logger.warning("Unmonitored chat detected")
-        await message.answer(MESSAGES[lang]["chat_not_monitored"], parse_mode="Markdown")
+        await message.answer(
+            MESSAGES[lang]["chat_not_monitored"].format(group_id=message.chat.id),
+            parse_mode="Markdown"
+        )
         return
     
     if not settings["active"]:
