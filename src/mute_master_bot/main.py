@@ -10,7 +10,7 @@ from aiogram.enums import ParseMode
 from . import config
 from .handlers import admin, moderation
 from .middlewares import LoggingContextMiddleware, LanguageMiddleware
-from .utils.file_ops import load_json_file, save_json_file
+from .utils.file_ops import load_json_file
 
 # --- Logging Setup ---
 class ContextFilter(logging.Filter):
@@ -32,13 +32,15 @@ def setup_logging():
     # Create handlers
     console_handler = logging.StreamHandler(sys.stdout)
     file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename=config.LOG_FILE, when="midnight", interval=1, backupCount=7, encoding='utf-8'
+        filename=config.LOG_FILE, when="midnight", interval=1, backupCount=14, encoding='utf-8'
     )
+    error_handler = logging.FileHandler(config.LOGS_DIR / "error.log", encoding='utf-8')
     
     # Set formatters
     formatter = logging.Formatter(log_format)
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
+    error_handler.setFormatter(formatter)
     
     # Get root logger and add handlers
     root_logger = logging.getLogger()
@@ -53,6 +55,10 @@ def setup_logging():
     # Set library log levels to be less verbose
     logging.getLogger("aiogram").setLevel(logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    
+    # Configure error handler for ERROR and CRITICAL levels
+    error_handler.setLevel(logging.ERROR)
+    root_logger.addHandler(error_handler)
 
 # --- Main Application ---
 async def main():
