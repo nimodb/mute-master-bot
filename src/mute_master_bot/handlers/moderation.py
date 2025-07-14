@@ -10,11 +10,10 @@ from aiogram.types import Message, MessageEntity, ChatPermissions, User
 
 
 from .. import config
+from ..utils.db import get_warnings, increment_warning, reset_warnings
 
 logger = logging.getLogger(__name__)
 
-# In-memory warning store. For persistence, consider using a database (e.g., SQLite).
-WARNINGS = defaultdict(lambda: defaultdict(int)) # WARNINGS[chat_id][user_id]
 
 def normalize_text(text: str) -> str:
     """Reduces repeated characters to avoid bypasses. E.g., 'heeeellooo' -> 'helo'."""
@@ -137,8 +136,7 @@ async def moderate_message(message: Message, bot: Bot, groups: Dict, messages: D
             return # Stop processing if we can't even delete the message
 
         # Manage warnings
-        WARNINGS[message.chat.id][user_id] += 1
-        current_warnings = WARNINGS[message.chat.id][user_id]
+        current_warnings = increment_warning(user_id, message.chat.id)
         max_warnings = settings.get("max_warnings", 3)
         user_mention = f"[{get_user_display_name(message.from_user)}](tg://user?id={user_id})"
         
@@ -146,7 +144,7 @@ async def moderate_message(message: Message, bot: Bot, groups: Dict, messages: D
 
         if current_warnings >= max_warnings:
             await apply_restriction(bot, message, user_id, user_mention, settings, messages)
-            WARNINGS[message.chat.id][user_id] = 0  # Reset warnings after action
+            reset_warnings(user_id, message.chat.id)  # Reset warnings after action
         else:
             warning_msg = await message.answer(
                 messages.get("warning_issued", "Warning issued.").format(

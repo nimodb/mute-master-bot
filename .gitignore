@@ -1,6 +1,11 @@
 # Environment variables
 *.env
 
+# Ignore SQLite database files
+*.sqlite3
+*.db
+*.sqlite3-journal
+
 # Dynamic configuration files
 config/groups.json
 config/user_settings.json

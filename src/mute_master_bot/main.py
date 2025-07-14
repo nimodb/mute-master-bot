@@ -65,6 +65,10 @@ async def main():
     """Initializes and runs the bot."""
     setup_logging()
     logger = logging.getLogger(__name__)
+    
+    # Initialize database
+    from .utils.db import init_db
+    init_db()
 
     # --- Pre-startup Checks ---
     if not config.BOT_TOKEN:
