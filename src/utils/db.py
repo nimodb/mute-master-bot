@@ -5,8 +5,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).resolve().parents[3] / "warnings.db"
-print(DB_PATH)
+DB_PATH = Path(__file__).resolve().parents[2] / "warnings.db"
 
 def init_db():
     """Initialize the SQLite database with a warnings table."""

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Set
 
 # Load environment variables from .env file
-load_dotenv(Path(__file__).resolve().parents[2] / "config" / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / "config" / ".env")
 
 # --- Core Settings ---
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
@@ -16,7 +16,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", 0))
 
 # --- Paths ---
-BASE_DIR = Path(__file__).resolve().parents[0]  # This will be the 'src/mute_master_bot' directory
+BASE_DIR = Path(__file__).resolve()  # This will be the 'src/' directory
 CONFIG_DIR = BASE_DIR.parent.parent / "config"
 LOGS_DIR = BASE_DIR.parent.parent / "logs"
 

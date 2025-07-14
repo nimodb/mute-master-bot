@@ -4,7 +4,6 @@ import logging.handlers
 import sys
 
 from aiogram import Bot, Dispatcher
-from aiogram.enums import ParseMode
 
 # Import from our new modular structure
 from . import config

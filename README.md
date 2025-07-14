@@ -27,7 +27,7 @@ A Telegram moderation bot built with Python and `aiogram` to filter inappropriat
 - Ensure `config/cuss_words.json`, `config/messages.json`, and `config/user_settings.json` exist with appropriate content (see example files or let the bot create defaults).
 
 ## Usage
-- Run the bot: `python3 -m mute_master_bot.main`.
+- Run the bot: `python3 -m src.main`.
 - Admin commands (usable only by `ALLOWED_USER_ID` in private chat):
   - `/addgroup <group_id>`: Add a group for moderation.
   - `/setwarnings <group_id> <number>`: Set maximum warnings.
@@ -53,7 +53,7 @@ MUTE_MASTER_BOT/
 │   ├── messages.json
 │   └── user_settings.json
 ├── logs/
-├── src/mute_master_bot/
+├── src/
 │   ├── handlers/
 │   │   ├── __init__.py
 │   │   ├── admin.py
