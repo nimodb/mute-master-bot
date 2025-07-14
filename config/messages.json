@@ -32,7 +32,11 @@
         "usage_removegroup": "Usage: `/removegroup <group_id>`",
         "user_language_set": "Your language has been set to {language}.",
         "usage_setuserlanguage": "Usage: `/setuserlanguage <en|fa>`",
-        "monitored_groups": "Monitored groups:"
+        "monitored_groups": "Monitored groups:",
+        "duration_hours": "{hours} hours",
+        "action_muted": "muted",
+        "duration_permanently": "permanently",
+        "action_banned": "banned"
     },
     "fa": {
         "chat_not_monitored": "این گروه (`{group_id}`) تحت نظارت نیست. لطفاً با @nimodb تماس بگیرید تا نظارت فعال شود.",
@@ -67,6 +71,10 @@
         "usage_removegroup": "نحوه استفاده: `/removegroup <group_id>`",
         "user_language_set": "زبان شما به {language} تنظیم شد.",
         "usage_setuserlanguage": "نحوه استفاده: `/setuserlanguage <en|fa>`",
-        "monitored_groups": "گروه‌های تحت نظارت:"
+        "monitored_groups": "گروه‌های تحت نظارت:",
+        "duration_hours": "{hours} ساعت",
+        "action_muted": "محدود",
+        "duration_permanently": "دائم",
+        "action_banned": "مسدود"
     }
 }

@@ -29,7 +29,13 @@ async def add_group(message: Message, bot: Bot, groups: Dict, messages: Dict):
             await message.reply(messages.get("bot_not_in_group", "Bot is not a member of this group or the ID is invalid."))
             return
 
-        groups[group_id_str] = {"active": True, "max_warnings": 3, "action": "mute", "language": "en"}
+        groups[group_id_str] = {
+            "active": True,
+            "max_warnings": 3,
+            "action": "mute",
+            "language": "en",
+            "name": chat.title if chat.title else "Unnamed Group"
+        }
         save_json_file(groups, config.GROUPS_FILE)
         await message.reply(messages.get("group_added", "Group added.").format(group_id=group_id))
         logger.info("Group %d added by admin %d.", group_id, message.from_user.id)
@@ -135,8 +141,9 @@ async def list_groups(message: Message, groups: Dict, messages: Dict):
         return
     
     group_list = [
-        messages.get("list_group_item", "ID: `{gid}` - Active: {active}, Warns: {warns}, Action: {action}, Lang: {lang}").format(
+        messages.get("list_group_item", "ID: `{gid}` - Name: {name} - Active: {active}, Warns: {warns}, Action: {action}, Lang: {lang}\n").format(
             gid=gid,
+            name=s.get("name", "N/A"),
             active=s.get("active", False),
             warns=s.get("max_warnings", "N/A"),
             action=s.get("action", "N/A"),
