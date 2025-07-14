@@ -32,7 +32,7 @@ def contains_violation(text: str, entities: Optional[List[MessageEntity]] = None
     if url_match := config.URL_PATTERN.search(text_lower):
         url = url_match.group(0)
         domain = urlparse(url if url.startswith("http") else "http://" + url).hostname or ""
-        if not (domain.endswith(tuple(config.WHITELISTED_TLDS)) or domain.endswith(tuple(config.WHITELISTED_DOMAINS))):
+        if domain and not (domain.endswith(tuple(config.WHITELISTED_TLDS)) or domain in config.WHITELISTED_DOMAINS):
             logger.debug("Violation: Non-whitelisted plaintext URL detected: %s", domain)
             return True
             
@@ -42,7 +42,7 @@ def contains_violation(text: str, entities: Optional[List[MessageEntity]] = None
             if entity.type in ("url", "text_link"):
                 url = entity.url if entity.type == "text_link" else text[entity.offset : entity.offset + entity.length]
                 domain = urlparse(url).hostname or ""
-                if not (domain.endswith(tuple(config.WHITELISTED_TLDS)) or domain.endswith(tuple(config.WHITELISTED_DOMAINS))):
+                if domain and not (domain.endswith(tuple(config.WHITELISTED_TLDS)) or domain in config.WHITELISTED_DOMAINS):
                     logger.debug("Violation: Non-whitelisted entity URL detected: %s", domain)
                     return True
 
@@ -112,6 +112,7 @@ async def moderate_message(message: Message, bot: Bot, groups: Dict, messages: D
 
     # Check if the bot should be active in this group
     if not settings or not settings.get("active", False):
+        await message.answer(messages.get("group_inactive", "Moderation is disabled in this group. Contact @nimodb for assistance."))
         return
 
     user_id = message.from_user.id

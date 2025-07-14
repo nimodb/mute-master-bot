@@ -1,7 +1,7 @@
 import logging
 from typing import Dict
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.exceptions import TelegramAPIError
@@ -169,6 +169,27 @@ async def remove_group(message: Message, groups: Dict, messages: Dict):
     except (IndexError, ValueError):
         await message.reply(messages.get("usage_removegroup", "Usage: /removegroup <group_id>"))
 
+async def handle_private_message(message: Message, bot: Bot, messages: Dict):
+    """Handles private messages based on user authorization."""
+    if message.from_user.id == config.ALLOWED_USER_ID:
+        logger.info("Authorized user %d accessed private commands", message.from_user.id)
+        await message.answer(
+            messages.get("invalid_private_message", "Please use one of the following commands:\n\n*Available Commands:*\n- `/addgroup <group_id>`: Add a group for moderation.\n- `/setwarnings <group_id> <number>`: Set maximum warnings for a group.\n- `/setaction <group_id> <mute|ban>`: Set the action for violations.\n- `/toggleactive <group_id>`: Enable or disable moderation.\n- `/setlanguage <group_id> <en|fa>`: Set group message language.\n- `/setuserlanguage <en|fa>`: Set your preferred language.\n- `/listgroups`: List all monitored groups.\n- `/removegroup <group_id>`: Remove a group from moderation."),
+            parse_mode="Markdown"
+        )
+    else:
+        user_info = {
+            "user_id": message.from_user.id,
+            "username": message.from_user.username or "N/A",
+            "first_name": message.from_user.first_name or "N/A",
+            "last_name": message.from_user.last_name or "N/A",
+            "language_code": message.from_user.language_code or "N/A",
+            "is_bot": message.from_user.is_bot,
+            "message_text": message.text or "N/A"
+        }
+        logger.warning("Unauthorized user attempted private interaction: %s", user_info)
+        await message.answer(messages.get("private_unauthorized", "Sorry, only authorized users can interact with me privately. Contact @nimodb for support."))
+
 def register(dp: Dispatcher):
     """Registers all admin command handlers for private chat."""
     admin_filter = AdminFilter()
@@ -180,3 +201,4 @@ def register(dp: Dispatcher):
     dp.message.register(set_user_language, Command("setuserlanguage"), admin_filter)
     dp.message.register(list_groups, Command("listgroups"), admin_filter)
     dp.message.register(remove_group, Command("removegroup"), admin_filter)
+    dp.message.register(handle_private_message, F.chat.type == "private")
