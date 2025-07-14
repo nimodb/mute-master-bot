@@ -9,52 +9,69 @@ A Telegram moderation bot built with Python and `aiogram` to filter inappropriat
 - **Private Chat Restriction**: Only the authorized user (`@nimodb`) can interact privately.
 - **Whitelist Support**: Allows specific domains (e.g., `visametric.com`) and usernames (e.g., `@mute_master_bot`).
 
+## Installation
+1. Clone the repository: `git clone <repository-url>`.
+2. Navigate to the project directory: `cd MUTE_MASTER_BOT`.
+3. Create a virtual environment: `python3 -m venv venv`.
+4. Activate the virtual environment:
+   - Linux/Mac: `source venv/bin/activate`
+   - Windows: `venv\Scripts\activate`
+5. Install dependencies: `pip install -r requirements.txt`.
+
+## Configuration
+- Create a `.env` file in the `config` directory with:
+  ```
+  BOT_TOKEN=your_telegram_bot_token
+  ALLOWED_USER_ID=your_telegram_id
+  ```
+- Ensure `config/cuss_words.json`, `config/messages.json`, and `config/user_settings.json` exist with appropriate content (see example files or let the bot create defaults).
+
+## Usage
+- Run the bot: `python3 -m mute_master_bot.main`.
+- Admin commands (usable only by `ALLOWED_USER_ID` in private chat):
+  - `/addgroup <group_id>`: Add a group for moderation.
+  - `/setwarnings <group_id> <number>`: Set maximum warnings.
+  - `/setaction <group_id> <mute|ban>`: Set action for violations.
+  - `/toggleactive <group_id>`: Enable/disable moderation.
+  - `/setlanguage <group_id> <en|fa>`: Set group language.
+  - `/setuserlanguage <en|fa>`: Set user language.
+  - `/listgroups`: List monitored groups.
+  - `/removegroup <group_id>`: Remove a group.
+
+## Troubleshooting
+- Check `logs/mute_master_bot.log` for errors.
+- Ensure the bot has admin permissions (delete messages, restrict members) in groups.
+- Verify JSON files are correctly formatted.
+
 ## Folder Structure
 ```
-mute_master_bot/
-├── src/
-│   └── bot.py              # Main bot script
+MUTE_MASTER_BOT/
 ├── config/
-│   ├── .env                # Environment variables
-│   ├── groups.json         # Group settings (auto-created, ignored by Git)
-│   ├── user_settings.json  # User language settings (auto-created, ignored by Git)
-│   ├── cuss_words.json     # Moderation word list
-│   └── messages.json       # Localized message templates
+│   ├── .env
+│   ├── cuss_words.json
+│   ├── groups.json
+│   ├── messages.json
+│   └── user_settings.json
 ├── logs/
-│   └── mute_master_bot.log # Log files
-├── tests/
-│   └── test_bot.py         # Unit tests
-├── docs/
-│   └── README.md           # Documentation
-├── requirements.txt        # Dependencies
-└── .gitignore              # Git ignore file
+├── src/mute_master_bot/
+│   ├── handlers/
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   └── moderation.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── file_ops.py
+│   ├── __init__.py
+│   ├── config.py
+│   ├── filters.py
+│   ├── main.py
+│   └── middlewares.py
+├── venv/
+├── .gitignore
+├── logo.jpg
+├── README.md
+└── requirements.txt
 ```
 
-## Setup
-1. Clone the repository.
-2. Create a virtual environment: `python -m venv .venv`
-3. Activate it: `source .venv/bin/activate` (Linux/Mac) or `.venv\Scripts\activate` (Windows)
-4. Install dependencies: `pip install -r requirements.txt`
-5. Set up `.env` in `config/` with `BOT_TOKEN`, `ALLOWED_USER_ID`, and `ENVIRONMENT=production`.
-6. Create `config/cuss_words.json` with moderation words.
-7. Create `config/messages.json` with localized message templates.
-8. Run the bot: `python src/bot.py`
-
-## Commands
-- `/addgroup <group_id>`: Add a group for moderation.
-- `/setwarnings <group_id> <number>`: Set maximum warnings.
-- `/setaction <group_id> <mute|ban>`: Set violation action.
-- `/toggleactive <group_id>`: Enable/disable moderation.
-- `/setlanguage <group_id> <en|fa>`: Set group language.
-- `/setuserlanguage <en|fa>`: Set user language.
-- `/listgroups`: List monitored groups.
-- `/removegroup <group_id>`: Remove a group from moderation.
-
-## Deployment
-- Use a process manager (e.g., `systemd`, `supervisord`) to keep the bot running.
-- Ensure `config/` is writable for `groups.json` and `user_settings.json`.
-- Monitor `logs/mute_master_bot.log` for errors.
-
-## Notes
-- Commands are restricted to the authorized user in private chat.
-- Logs rotate daily with a 7-day backup.
+## License
+[MIT License](LICENSE).
