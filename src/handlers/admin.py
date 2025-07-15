@@ -280,7 +280,6 @@ async def show_group_info(message: Message, groups: Dict, messages: Dict):
             usernames=", ".join(group_info.get("whitelisted_usernames", [])) or "None",
             tlds=", ".join(group_info.get("whitelisted_tlds", [])) or "None"
         )
-        print(info_text)
         await message.reply(info_text)
         logger.info("Group info for %s displayed by admin %d.", group_id_str, message.from_user.id)
     except (IndexError, ValueError):
