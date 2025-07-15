@@ -28,17 +28,17 @@ LOG_FILE = LOGS_DIR / "mute_master_bot.log"
 
 # --- Bot Constants ---
 BOT_USERNAME = "@mute_master_bot"
-MUTE_DURATION_SECONDS = 86400  # 24 hours
 
 # --- Moderation Actions ---
 ACTION_MUTE = "mute"
 ACTION_BAN = "ban"
 SUPPORTED_LANGUAGES = {"en", "fa"}
 
-# --- Whitelists ---
-WHITELISTED_DOMAINS: Set[str] = {"visametric.com"}
-WHITELISTED_USERNAMES: Set[str] = {BOT_USERNAME, "@Vi_Ka1401", "@Tna_jy"}
-WHITELISTED_TLDS: Set[str] = {".de"}
+# --- Bot Constants (Default Values) ---
+DEFAULT_MUTE_DURATION_SECONDS = 3600  # 1 Hours
+DEFAULT_WHITELISTED_DOMAINS: Set[str] = {"example.com"}
+DEFAULT_WHITELISTED_USERNAMES: Set[str] = {BOT_USERNAME, "@nimodb"}
+DEFAULT_WHITELISTED_TLDS: Set[str] = {".de"}
 
 # --- Pre-compiled Regex Patterns ---
 URL_PATTERN = re.compile(r'(?:https?://)?(?:www\.)?[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}(?:/[^ ]*)?', re.IGNORECASE)

@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 from urllib.parse import urlparse
 from typing import Optional, List, Dict
 
@@ -10,7 +9,7 @@ from aiogram.types import Message, MessageEntity, ChatPermissions, User
 
 
 from .. import config
-from ..utils.db import get_warnings, increment_warning, reset_warnings
+from ..utils.db import increment_warning, reset_warnings
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +21,20 @@ def normalize_text(text: str) -> str:
         for word in text.split()
     )
 
-def contains_violation(text: str, entities: Optional[List[MessageEntity]] = None) -> bool:
+def contains_violation(text: str, entities: Optional[List[MessageEntity]] = None, settings: Dict = None) -> bool:
     """Checks a message for any moderation violations (cuss words, links, usernames)."""
     text_lower = text.lower()
+    settings = settings or {}
+    whitelisted_domains = set(settings.get("whitelisted_domains", config.DEFAULT_WHITELISTED_DOMAINS))
+    whitelisted_usernames = set(settings.get("whitelisted_usernames", config.DEFAULT_WHITELISTED_USERNAMES))
+    whitelisted_tlds = set(settings.get("whitelisted_tlds", config.DEFAULT_WHITELISTED_TLDS))
 
     # 1. Check for non-whitelisted URLs
     # First, check plain text URLs
     if url_match := config.URL_PATTERN.search(text_lower):
         url = url_match.group(0)
         domain = urlparse(url if url.startswith("http") else "http://" + url).hostname or ""
-        if domain and not (domain.endswith(tuple(config.WHITELISTED_TLDS)) or domain in config.WHITELISTED_DOMAINS):
+        if domain and not (domain in whitelisted_domains or any(domain.endswith(tld) for tld in whitelisted_tlds)):
             logger.debug("Violation: Non-whitelisted plaintext URL detected: %s", domain)
             return True
             
@@ -41,7 +44,7 @@ def contains_violation(text: str, entities: Optional[List[MessageEntity]] = None
             if entity.type in ("url", "text_link"):
                 url = entity.url if entity.type == "text_link" else text[entity.offset : entity.offset + entity.length]
                 domain = urlparse(url).hostname or ""
-                if domain and not (domain.endswith(tuple(config.WHITELISTED_TLDS)) or domain in config.WHITELISTED_DOMAINS):
+                if domain and not (domain in whitelisted_domains or any(domain.endswith(tld) for tld in whitelisted_tlds)):
                     logger.debug("Violation: Non-whitelisted entity URL detected: %s", domain)
                     return True
 
@@ -52,7 +55,7 @@ def contains_violation(text: str, entities: Optional[List[MessageEntity]] = None
 
     # 3. Check for non-whitelisted usernames
     if usernames := config.USERNAME_PATTERN.findall(text):
-        if not all(u in config.WHITELISTED_USERNAMES for u in usernames):
+        if not all(u in whitelisted_usernames for u in usernames):
             logger.debug("Violation: Non-whitelisted username detected.")
             return True
             
@@ -65,8 +68,8 @@ def get_user_display_name(user: User) -> str:
 async def apply_restriction(bot: Bot, message: Message, user_id: int, user_mention: str, settings: Dict, messages: Dict):
     """Applies the configured restriction (mute or ban) to a user."""
     action = settings["action"]
-    lang = settings["language"]
-    max_warnings = settings["max_warnings"]
+    max_warnings = settings.get("max_warnings", 3)
+    mute_duration = settings.get("mute_duration_seconds", config.DEFAULT_MUTE_DURATION_SECONDS)
     
     try:
         if action == config.ACTION_MUTE:
@@ -74,9 +77,9 @@ async def apply_restriction(bot: Bot, message: Message, user_id: int, user_menti
                 chat_id=message.chat.id,
                 user_id=user_id,
                 permissions=ChatPermissions(can_send_messages=False),
-                until_date=message.date.timestamp() + config.MUTE_DURATION_SECONDS
+                until_date=message.date.timestamp() + mute_duration
             )
-            duration_text = messages.get("duration_hours", f"{config.MUTE_DURATION_SECONDS // 3600} hours").format(hours=config.MUTE_DURATION_SECONDS // 3600)
+            duration_text = messages.get("duration_hours", f"{mute_duration // 3600} hours").format(hours=mute_duration // 3600)
             action_text = messages.get("action_muted", "muted")
         else:  # ban
             await bot.ban_chat_member(chat_id=message.chat.id, user_id=user_id)
@@ -104,13 +107,16 @@ async def apply_restriction(bot: Bot, message: Message, user_id: int, user_menti
 async def moderate_message(message: Message, bot: Bot, groups: Dict, messages: Dict, lang: str):
     """The main handler for moderating incoming group messages."""
     chat_id_str = str(message.chat.id)
-    settings = groups.get(chat_id_str)
+    settings = groups.get(chat_id_str, {})
 
     if not message.text or not message.from_user:
         return # Ignore messages without text or a user (e.g., service messages)
 
     # Check if the bot should be active in this group
-    if not settings or not settings.get("active", False):
+    if not settings:
+        await message.answer(messages.get("chat_not_monitored", "This group is not monitored. Please contact @nimodb.").format(group_id=chat_id_str), parse_mode="Markdown")
+        return
+    if not settings.get("active", False):
         await message.answer(messages.get("group_inactive", "Moderation is disabled in this group. Contact @nimodb for assistance."))
         return
 
@@ -127,7 +133,7 @@ async def moderate_message(message: Message, bot: Bot, groups: Dict, messages: D
         return # Fail safe if we can't check status
 
     # Perform violation check
-    if contains_violation(message.text, message.entities):
+    if contains_violation(message.text, message.entities, settings):
         try:
             await message.delete()
         except TelegramAPIError as e:

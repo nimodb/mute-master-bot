@@ -7,7 +7,7 @@
         "add_to_group_prompt_button": "Add the bot to group",
         "warning_issued": "Warning {current}/{max} for {user_mention}: Links, unauthorized usernames, or inappropriate words are not allowed.",
         "user_restricted": "Due to {max_warnings} violations, {user_mention} has been {action} for {duration}.",
-        "invalid_private_message": "Please use one of the following commands:\n\n*Available Commands:*\n- `/addgroup <group_id>`: Add a group for moderation.\n- `/setwarnings <group_id> <number>`: Set maximum warnings for a group.\n- `/setaction <group_id> <mute|ban>`: Set the action for violations.\n- `/toggleactive <group_id>`: Enable or disable moderation.\n- `/setlanguage <group_id> <en|fa>`: Set group message language.\n- `/setuserlanguage <en|fa>`: Set your preferred language.\n- `/listgroups`: List all monitored groups.\n- `/removegroup <group_id>`: Remove a group from moderation.",
+        "invalid_private_message": "Please use one of the following commands:\n\n*Available Commands:*\n- `/addgroup <group_id>`: Add a group for moderation.\n- `/setwarnings <group_id> <number>`: Set maximum warnings.\n- `/setaction <group_id> <mute|ban>`: Set action for violations.\n- `/setmuteduration <group_id> <seconds>`: Set mute duration in seconds.\n- `/setwhitelisteddomains <group_id> <domain1> <domain2> ...`: Set whitelisted domains.\n- `/setwhitelistedusernames <group_id> <@username1> <@username2> ...`: Set whitelisted usernames.\n- `/setwhitelistedtlds <group_id> <.tld1> <.tld2> ...`: Set whitelisted TLDs.\n- `/showgroupinfo <group_id>`: Display detailed group settings.\n- `/toggleactive <group_id>`: Enable or disable moderation.\n- `/setlanguage <group_id> <en|fa>`: Set group message language.\n- `/setuserlanguage <en|fa>`: Set your preferred language.\n- `/listgroups`: List all monitored groups.\n- `/removegroup <group_id>`: Remove a group from moderation.",
         "group_added": "Group {group_id} added for moderation with default settings.",
         "group_already_monitored": "This group is already monitored.",
         "invalid_group_id": "Invalid group ID. Must be a group or supergroup.",
@@ -36,7 +36,19 @@
         "duration_hours": "{hours} hours",
         "action_muted": "muted",
         "duration_permanently": "permanently",
-        "action_banned": "banned"
+        "action_banned": "banned",
+        "duration_must_be_positive": "Duration must be a positive integer.",
+        "mute_duration_set": "Mute duration set to {duration} seconds for group {group_id}.",
+        "usage_setmuteduration": "Usage: /setmuteduration <group_id> <seconds>",
+        "whitelisted_domains_set": "Whitelisted domains set to {domains} for group {group_id}.",
+        "usage_setwhitelisteddomains": "Usage: /setwhitelisteddomains <group_id> <domain1> <domain2> ...",
+        "whitelisted_usernames_set": "Whitelisted usernames set to {usernames} for group {group_id}.",
+        "usage_setwhitelistedusernames": "Usage: /setwhitelistedusernames <group_id> <@username1> <@username2> ...",
+        "whitelisted_tlds_set": "Whitelisted TLDs set to {tlds} for group {group_id}.",
+        "usage_setwhitelistedtlds": "Usage: /setwhitelistedtlds <group_id> <.tld1> <.tld2> ...",
+        "group_info": "Group Info for ID: `{group_id}`\n- Name: {name}\n- Active: {active}\n- Max Warnings: {max_warnings}\n- Action: {action}\n- Language: {lang}\n- Mute Duration: {mute_duration} seconds\n- Whitelisted Domains: {domains}\n- Whitelisted Usernames: {usernames}\n- Whitelisted TLDs: {tlds}",
+        "usage_showgroupinfo": "Usage: /showgroupinfo <group_id>",
+        "error_showing_group_info": "Error retrieving group information."
     },
     "fa": {
         "chat_not_monitored": "این گروه (`{group_id}`) تحت نظارت نیست. لطفاً با @nimodb تماس بگیرید تا نظارت فعال شود.",
@@ -46,7 +58,7 @@
         "add_to_group_prompt_button": "افزودن ربات به گروه",
         "warning_issued": "اخطار {current}/{max} برای {user_mention}: لینک‌ها، نام‌های کاربری غیرمجاز یا کلمات نامناسب ممنوع است.",
         "user_restricted": "به دلیل {max_warnings} تخلف، {user_mention} به مدت {duration} {action} شد.",
-        "invalid_private_message": "لطفاً از یکی از دستورات زیر استفاده کنید:\n\n*دستورات موجود:*\n- `/addgroup <group_id>`: افزودن یک گروه برای نظارت.\n- `/setwarnings <group_id> <number>`: تنظیم حداکثر اخطارها برای یک گروه.\n- `/setaction <group_id> <mute|ban>`: تنظیم اقدام برای تخلفات.\n- `/toggleactive <group_id>`: فعال یا غیرفعال کردن نظارت.\n- `/setlanguage <group_id> <en|fa>`: تنظیم زبان پیام‌های گروه.\n- `/setuserlanguage <en|fa>`: تنظیم زبان مورد نظر شما.\n- `/listgroups`: نمایش تمام گروه‌های تحت نظارت.\n- `/removegroup <group_id>`: حذف یک گروه از نظارت.",
+        "invalid_private_message": "لطفاً از یکی از دستورات زیر استفاده کنید:\n\n*دستورات موجود:*\n- `/addgroup <group_id>`: افزودن یک گروه برای نظارت.\n- `/setwarnings <group_id> <number>`: تنظیم حداکثر اخطارها.\n- `/setaction <group_id> <mute|ban>`: تنظیم اقدام برای تخلفات.\n- `/setmuteduration <group_id> <ثانیه>`: تنظیم مدت زمان سکوت.\n- `/setwhitelisteddomains <group_id> <دامنه1> <دامنه2> ...`: تنظیم دامنه‌های مجاز.\n- `/setwhitelistedusernames <group_id> <@نام‌کاربری1> <@نام‌کاربری2> ...`: تنظیم نام‌های کاربری مجاز.\n- `/setwhitelistedtlds <group_id> <.پسوند1> <.پسوند2> ...`: تنظیم پسوندهای مجاز.\n- `/showgroupinfo <group_id>`: نمایش اطلاعات گروه.\n- `/toggleactive <group_id>`: فعال یا غیرفعال کردن نظارت.\n- `/setlanguage <group_id> <en|fa>`: تنظیم زبان پیام‌های گروه.\n- `/setuserlanguage <en|fa>`: تنظیم زبان مورد نظر شما.\n- `/listgroups`: نمایش تمام گروه‌های تحت نظارت.\n- `/removegroup <group_id>`: حذف یک گروه از نظارت.",
         "group_added": "گروه {group_id} با تنظیمات پیش‌فرض برای نظارت افزوده شد.",
         "group_already_monitored": "این گروه قبلاً تحت نظارت است.",
         "invalid_group_id": "آیدی گروه نامعتبر است. باید یک گروه یا سوپرگروه باشد.",
@@ -75,6 +87,18 @@
         "duration_hours": "{hours} ساعت",
         "action_muted": "محدود",
         "duration_permanently": "دائم",
-        "action_banned": "مسدود"
+        "action_banned": "مسدود",
+        "duration_must_be_positive": "مدت زمان باید یک عدد مثبت باشد.",
+        "mute_duration_set": "مدت زمان سکوت به {duration} ثانیه برای گروه {group_id} تنظیم شد.",
+        "usage_setmuteduration": "نحوه استفاده: /setmuteduration <group_id> <ثانیه>",
+        "whitelisted_domains_set": "دامنه‌های مجاز به {domains} برای گروه {group_id} تنظیم شد.",
+        "usage_setwhitelisteddomains": "نحوه استفاده: /setwhitelisteddomains <group_id> <دامنه1> <دامنه2> ...",
+        "whitelisted_usernames_set": "نام‌های کاربری مجاز به {usernames} برای گروه {group_id} تنظیم شد.",
+        "usage_setwhitelistedusernames": "نحوه استفاده: /setwhitelistedusernames <group_id> <@نام‌کاربری1> <@نام‌کاربری2> ...",
+        "whitelisted_tlds_set": "پسوندهای مجاز به {tlds} برای گروه {group_id} تنظیم شد.",
+        "usage_setwhitelistedtlds": "نحوه استفاده: /setwhitelistedtlds <group_id> <.پسوند1> <.پسوند2> ...",
+        "group_info": "اطلاعات گروه با آیدی: `{group_id}`\n- نام: {name}\n- فعال: {active}\n- حداکثر اخطارها: {max_warnings}\n- اقدام: {action}\n- زبان: {lang}\n- مدت زمان سکوت: {mute_duration} ثانیه\n- دامنه‌های مجاز: {domains}\n- نام‌های کاربری مجاز: {usernames}\n- پسوندهای مجاز: {tlds}",
+        "usage_showgroupinfo": "نحوه استفاده: /showgroupinfo <group_id>",
+        "error_showing_group_info": "خطا در بازیابی اطلاعات گروه."
     }
 }

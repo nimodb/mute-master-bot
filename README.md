@@ -4,10 +4,10 @@ A Telegram moderation bot built with Python and `aiogram` to filter inappropriat
 
 ## Features
 - **Content Moderation**: Deletes messages with cuss words, non-whitelisted links, or unauthorized usernames.
-- **Group-Specific Settings**: Configurable warning limits and actions (mute or ban) per group.
+- **Group-Specific Settings**: Configurable warning limits, actions (mute or ban), mute duration, and whitelists (domains, usernames, TLDs) per group.
 - **Admin Exemption**: Admins and group creators are exempt from moderation.
-- **Private Chat Restriction**: Only the authorized user (`@nimodb`) can interact privately.
-- **Whitelist Support**: Allows specific domains (e.g., `visametric.com`) and usernames (e.g., `@mute_master_bot`).
+- **Private Chat Restriction**: Only the authorized user (`@nimodb`) can interact privately with full command access.
+- **Whitelist Support**: Allows specific domains (e.g., `visametric.com`), usernames (e.g., `@mute_master_bot`), and TLDs (e.g., `.de`) per group.
 
 ## Installation
 1. Clone the repository: `git clone <repository-url>`.
@@ -25,18 +25,24 @@ A Telegram moderation bot built with Python and `aiogram` to filter inappropriat
   ALLOWED_USER_ID=your_telegram_id
   ```
 - Ensure `config/cuss_words.json`, `config/messages.json`, and `config/user_settings.json` exist with appropriate content (see example files or let the bot create defaults).
+- Edit `config/groups.json` to customize group settings (e.g., mute duration, whitelists).
 
 ## Usage
 - Run the bot: `python3 -m src.main`.
 - Admin commands (usable only by `ALLOWED_USER_ID` in private chat):
-  - `/addgroup <group_id>`: Add a group for moderation.
+  - `/addgroup <group_id>`: Add a group for moderation with default settings.
   - `/setwarnings <group_id> <number>`: Set maximum warnings.
   - `/setaction <group_id> <mute|ban>`: Set action for violations.
+  - `/setmuteduration <group_id> <seconds>`: Set mute duration in seconds.
+  - `/setwhitelisteddomains <group_id> <domain1> <domain2> ...`: Set whitelisted domains.
+  - `/setwhitelistedusernames <group_id> <@username1> <@username2> ...`: Set whitelisted usernames.
+  - `/setwhitelistedtlds <group_id> <.tld1> <.tld2> ...`: Set whitelisted TLDs.
+  - `/showgroupinfo <group_id>`: Display detailed settings for a specific group.
   - `/toggleactive <group_id>`: Enable/disable moderation.
-  - `/setlanguage <group_id> <en|fa>`: Set group language.
-  - `/setuserlanguage <en|fa>`: Set user language.
-  - `/listgroups`: List monitored groups.
-  - `/removegroup <group_id>`: Remove a group.
+  - `/setlanguage <group_id> <en|fa>`: Set group message language.
+  - `/setuserlanguage <en|fa>`: Set your preferred language.
+  - `/listgroups`: List all monitored groups.
+  - `/removegroup <group_id>`: Remove a group from moderation.
 
 ## Troubleshooting
 - Check `logs/mute_master_bot.log` for errors.
