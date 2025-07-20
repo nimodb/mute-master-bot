@@ -125,8 +125,9 @@ async def moderate_message(message: Message, bot: Bot, groups: Dict, messages: D
     # Exempt admins and creators
     try:
         member = await bot.get_chat_member(chat_id=message.chat.id, user_id=user_id)
-        if member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR]:
-            logger.debug("User %d is an admin in chat %d, exempt from moderation.", user_id, message.chat.id)
+        if (member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR] or
+            (hasattr(member, 'user') and member.user.is_bot and member.user.username == 'GroupAnonymousBot')):
+            logger.debug("User %d is an admin, creator, or GroupAnonymousBot in chat %d, exempt from moderation.", user_id, message.chat.id)
             return
     except TelegramAPIError as e:
         logger.error("Could not get chat member status for user %d in chat %d: %s", user_id, message.chat.id, e)
